@@ -9,6 +9,10 @@ Tested in Arduino Uno.
 
 Files:
 
+LoRaMESH.cpp
+   - This library contains a set of functions to configure and operate the
+     EndDevice LoRaMESH Radioenge
+
 Example_masterslave_analog.ino
    - Initializes the software serial interface on the pins 6 (RX) and 7 (TX).
    - Reads the local device ID to check if it is a master or slave.
