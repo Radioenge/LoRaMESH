@@ -256,6 +256,8 @@ MeshStatus_Typedef ReceivePacketCommand(uint16_t* id, uint8_t* command, uint8_t*
   if(payload == NULL) return MESH_ERROR;
   if(payloadSize == NULL) return MESH_ERROR;
   if(hSerialCommand == NULL) return MESH_ERROR;
+
+  if(!hSerialCommand->isListening()) hSerialCommand->listen();
   
   /* Waits for reception */
   while( ((timeout > 0 ) || (i > 0)) && (waitNextByte > 0) )
@@ -302,11 +304,13 @@ MeshStatus_Typedef ReceivePacketTransp(uint16_t* id, uint8_t* payload, uint8_t* 
   uint8_t i = 0;
   
   /* Assert parameters */
-  if(id == NULL) return MESH_ERROR;
+  if((id == NULL) && (deviceId == 0)) return MESH_ERROR;
   if(payload == NULL) return MESH_ERROR;
   if(payloadSize == NULL) return MESH_ERROR;
   if(hSerialTransp == NULL) return MESH_ERROR;
   if(deviceId == -1) return MESH_ERROR;
+
+  if(!hSerialTransp->isListening()) hSerialTransp->listen();
   
   /* Waits for reception */
   while( ((timeout > 0 ) || (i > 0)) && (waitNextByte > 0) )
