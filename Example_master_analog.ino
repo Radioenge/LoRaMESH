@@ -50,7 +50,6 @@ void setup() {
   
   /* Initialize SoftwareSerial */
   hSerialCommands = SerialCommandsInit(7, 6, 9600);
-  hSerialCommands->listen();
   
   /* Gets the local device ID */
   if(LocalRead(&localId, &localNet, &localUniqueId) != MESH_OK)
