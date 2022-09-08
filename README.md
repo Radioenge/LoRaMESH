@@ -3,7 +3,6 @@
 <h2>Informações sobre a biblioteca e o LoRa</h2>
 Esta biblioteca, na verdade é um fork da biblioteca da Radioenge, porém foram adicionados as principais configurações do módulo RD42C de modo que o desenvolvedor tenha maior autonomia em suas aplicações, ao invés de usar um aplicativo e configurar manualmente.
 
-
 - Autor: Gustavo Cereza;
 - Corrigido por: Marco Chiodi;
 - Testado e revisado por: Gabriel Tabaroski.
