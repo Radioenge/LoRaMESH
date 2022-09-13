@@ -1,29 +1,3 @@
-/*-------------------------------------------------------------------------------------
-
-    MIT License
-
-    Copyright (c) 2022 elcereza
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
-
--------------------------------------------------------------------------------------*/
-
 #ifndef LoRaMESH_h
 #define LoRaMESH_h
 
@@ -80,7 +54,7 @@
 #define LoRa_LOGICAL_LEVEL_LOW    0x00
 #define LoRa_LOGICAL_LEVEL_HIGH   0x01
 
-class LoRaMESH{
+class LoRaMESH{     
     public:
         bool debug_serial = false;
         typedef struct
@@ -113,9 +87,11 @@ class LoRaMESH{
             MESH_ERROR
         } MeshStatus_Typedef;
         Stream*  SerialLoRa;
+        Stream*  SerialLoRat;
 
-        LoRaMESH(Stream *_SerialLoRa){
+        LoRaMESH(Stream *_SerialLoRa, Stream *_SerialLoRat = NULL){
             SerialLoRa = _SerialLoRa;
+            SerialLoRat = _SerialLoRat;
         }
 
         uint16_t ComputeCRC(uint8_t* data_in, uint16_t length){
@@ -181,13 +157,14 @@ class LoRaMESH{
         {
             uint8_t i = 0;
 
-            if(payload < 0x00) return MESH_ERROR;
+            if(payload == NULL) return MESH_ERROR;
             if(id > 1023) return MESH_ERROR;
-            if(deviceId < 0x00) return MESH_ERROR;
+            if(deviceId == -1) return MESH_ERROR;
             
-            if((id != 0) && (deviceId == 0)) 
+            if((id != 0) && (deviceId == 0))  /* Is master */
             {
                 frame.size = payloadSize + 2;
+                /* Loads the target's ID */
                 frame.buffer[i++] = id&0xFF;
                 frame.buffer[i++] = (id>>8)&0x03;
             }
@@ -198,16 +175,17 @@ class LoRaMESH{
             
             if((payloadSize >= 0) && (payloadSize < MAX_PAYLOAD_SIZE))
             {
+                /* Loads the payload */
                 memcpy(&frame.buffer[i], payload, payloadSize);
             }
             else
             {
+                /* Invalid payload size */
                 memset(&frame.buffer[0], 0, MAX_BUFFER_SIZE);
                 return MESH_ERROR;
             }
 
             frame.command = false;
-
             return MESH_OK;
         }
 
@@ -220,7 +198,10 @@ class LoRaMESH{
                 
             }
 
-            SerialLoRa->write(frame.buffer, frame.size);
+            if(frame.command)
+                SerialLoRa->write(frame.buffer, frame.size);
+            else
+                SerialLoRat->write(frame.buffer, frame.size);
 
             return MESH_OK;
         }
@@ -441,10 +422,6 @@ class LoRaMESH{
                 return false;
             else if(lora_window < 0x00 || lora_window > 0x02)
                 return false;
-            else if(debug_serial && lora_class == 0x02 && lora_window > 0x00){
-                Serial.println("Apenas a classe A tem janela de tempo dormindo");
-                return false;
-            }
             
             uint8_t b = 0;
 
@@ -464,7 +441,7 @@ class LoRaMESH{
         }    
 
         bool config_digital_gpio(uint8_t gpio, uint8_t pull, uint8_t inout, uint8_t logical_level){
-            if(gpio < 0x00 || gpio > 0x07 || gpio == 0x05 || gpio == 0x06)
+            if(gpio < 0x00 || gpio > 0x07)
                 return false;
             else if(pull < 0x00 || pull > 0x02)
                 return false;
@@ -486,8 +463,9 @@ class LoRaMESH{
             
             if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK)
             {
-                if(command == 0xC2)
-                    return true;
+                if(command == 0xC2){
+                return true;
+                }
             }
 
             return false;
