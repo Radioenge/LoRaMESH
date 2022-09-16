@@ -161,17 +161,9 @@ class LoRaMESH{
             if(id > 1023) return MESH_ERROR;
             if(deviceId == -1) return MESH_ERROR;
             
-            if((id != 0) && (deviceId == 0))  /* Is master */
-            {
-                frame.size = payloadSize + 2;
-                /* Loads the target's ID */
-                frame.buffer[i++] = id&0xFF;
-                frame.buffer[i++] = (id>>8)&0x03;
-            }
-            else
-            {
-                frame.size = payloadSize;
-            }
+            frame.size = payloadSize + 2;
+            frame.buffer[i++] = id&0xFF;
+            frame.buffer[i++] = (id>>8)&0x03;
             
             if((payloadSize >= 0) && (payloadSize < MAX_PAYLOAD_SIZE))
             {
