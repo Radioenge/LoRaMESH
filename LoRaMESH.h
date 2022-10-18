@@ -54,7 +54,7 @@
 #define LoRa_LOGICAL_LEVEL_LOW    0x00
 #define LoRa_LOGICAL_LEVEL_HIGH   0x01
 
-class LoRaMESH{     
+class LoRaMESH{
     public:
         bool debug_serial = false;
         typedef struct
@@ -81,11 +81,6 @@ class LoRaMESH{
 
         uint8_t BW, SF, CR, LoRa_class, LoRa_window;
 
-        typedef enum
-        {
-            MESH_OK,
-            MESH_ERROR
-        } MeshStatus_Typedef;
         Stream*  SerialLoRa;
         Stream*  SerialLoRat;
 
@@ -118,11 +113,11 @@ class LoRaMESH{
             return (crc_calc&0xFFFF);
         }
 
-        MeshStatus_Typedef PrepareFrameCommand(uint16_t id, uint8_t command, uint8_t* payload, uint8_t payloadSize){
-            if((id < 0)) return MESH_ERROR;
-            if(command < 0) return MESH_ERROR;
-            if(payload < 0) return MESH_ERROR;
-            if(payloadSize < 0) return MESH_ERROR;
+        bool PrepareFrameCommand(uint16_t id, uint8_t command, uint8_t* payload, uint8_t payloadSize){
+            if((id < 0)) return false;
+            if(command < 0) return false;
+            if(payload < 0) return false;
+            if(payloadSize < 0) return false;
             
 
             uint16_t crc = 0;
@@ -145,25 +140,37 @@ class LoRaMESH{
             else
             {
                 memset(&frame.buffer[0], 0, MAX_BUFFER_SIZE);
-                return MESH_ERROR;
+                return false;
             }
 
             frame.command = true;
 
-            return MESH_OK;
+            return true;
         }
 
-        MeshStatus_Typedef PrepareFrameTransp(uint16_t id, uint8_t* payload, uint8_t payloadSize)
+        bool PrepareFrameTransp(uint16_t id, uint8_t* payload, uint8_t payloadSize)
         {
             uint8_t i = 0;
 
-            if(payload == NULL) return MESH_ERROR;
-            if(id > 1023) return MESH_ERROR;
-            if(deviceId == -1) return MESH_ERROR;
+            if(payload == NULL) return false;
+            if(id > 1023) return false;
+            if(deviceId == -1) return false;
             
             frame.size = payloadSize + 2;
             frame.buffer[i++] = id&0xFF;
             frame.buffer[i++] = (id>>8)&0x03;
+            
+            /*
+            if((id != 0) && (deviceId == 0)) 
+            {
+                frame.size = payloadSize + 2;
+                frame.buffer[i++] = id&0xFF;
+                frame.buffer[i++] = (id>>8)&0x03;
+            }
+            else
+            {
+                frame.size = payloadSize;
+            }*/
             
             if((payloadSize >= 0) && (payloadSize < MAX_PAYLOAD_SIZE))
             {
@@ -174,15 +181,15 @@ class LoRaMESH{
             {
                 /* Invalid payload size */
                 memset(&frame.buffer[0], 0, MAX_BUFFER_SIZE);
-                return MESH_ERROR;
+                return false;
             }
 
             frame.command = false;
-            return MESH_OK;
+            return true;
         }
 
-        MeshStatus_Typedef SendPacket(){
-            if(frame.size == 0) return MESH_ERROR;
+        bool SendPacket(){
+            if(frame.size == 0) return false;
             if(debug_serial)
             {
                 Serial.print("TX: ");
@@ -193,23 +200,23 @@ class LoRaMESH{
             if(frame.command)
                 SerialLoRa->write(frame.buffer, frame.size);
             else
-                SerialLoRat->write(frame.buffer, frame.size);
+                if(SerialLoRat == NULL)
+                    return false;
+                else
+                    SerialLoRat->write(frame.buffer, frame.size);
 
-            return MESH_OK;
+            return true;
         }
 
-
-
-
-        MeshStatus_Typedef ReceivePacketCommand(uint16_t* id, uint8_t* command, uint8_t* payload, uint8_t* payloadSize, uint32_t timeout){
+        bool ReceivePacketCommand(uint16_t* id, uint8_t* command, uint8_t* payload, uint8_t* payloadSize, uint32_t timeout){
             uint16_t waitNextByte = 500;
             uint8_t i = 0;
             uint16_t crc = 0;
 
-            if(id < 0x00) return MESH_ERROR;
-            if(command < 0x00) return MESH_ERROR;
-            if(payload < 0x00) return MESH_ERROR;
-            if(payloadSize < 0x00) return MESH_ERROR;
+            if(id < 0x00) return false;
+            if(command < 0x00) return false;
+            if(payload < 0x00) return false;
+            if(payloadSize < 0x00) return false;
 
             while( ((timeout > 0 ) || (i > 0)) && (waitNextByte > 0) )
             {
@@ -232,16 +239,70 @@ class LoRaMESH{
                 printHex(frame.buffer, i);
             }
 
-            if((timeout == 0) && (i == 0)) return MESH_ERROR;
+            if((timeout == 0) && (i == 0)) return false;
             crc = (uint16_t)frame.buffer[i-2] | ((uint16_t)frame.buffer[i-1] << 8);
-            if(ComputeCRC(&frame.buffer[0], i-2) != crc) return MESH_ERROR;
+            if(ComputeCRC(&frame.buffer[0], i-2) != crc) return false;
             *id = (uint16_t)frame.buffer[0] | ((uint16_t)frame.buffer[1] << 8);
             *command = frame.buffer[2];
             *payloadSize = i-5;
             memcpy(payload, &frame.buffer[3], i-5);
             
-            return MESH_OK;
+            return true;
         }
+
+        bool ReceivePacketTransp(uint16_t* id, uint8_t* payload, uint8_t* payloadSize, uint32_t timeout)
+        {
+            uint16_t waitNextByte = 500;
+            uint8_t i = 0;
+            
+            /* Assert parameters */
+            /*
+            if((id == NULL) && (deviceId == 0)) return false;
+            if(payload == NULL) return false;
+            if(payloadSize == NULL) return false;
+            if(deviceId == -1) return false;
+            */
+            /* Waits for reception */
+            while( ((timeout > 0 ) || (i > 0)) && (waitNextByte > 0) )
+            {
+                if(SerialLoRat->available() > 0)
+                {
+                    frame.buffer[i++] = SerialLoRat->read();
+                    waitNextByte = 500;
+                }
+                
+                if(i > 0)
+                {
+                waitNextByte--;
+                }
+                timeout--;
+                delay(1);
+            }
+
+            /* In case it didn't get any data */
+            if((timeout == 0) && (i == 0)) return false;
+
+            if(deviceId == 0)
+            {
+                /* Copies ID */
+                *id = (uint16_t)frame.buffer[0] | ((uint16_t)frame.buffer[1] << 8);
+                /* Copies payload size */
+                *payloadSize = i-2;
+                /* Copies payload */
+                memcpy(payload, &frame.buffer[3], i-2);
+            }
+            else
+            {
+                /* Copies payload size */
+                *payloadSize = i;
+                /* Copies payload */
+                memcpy(payload, &frame.buffer[0], i);
+            }
+            
+            return true;
+        }
+
+
 
         bool localread(){
             uint8_t b = 0;
@@ -253,7 +314,7 @@ class LoRaMESH{
             PrepareFrameCommand(0, 0xE2, bufferPayload, b + 1);
             SendPacket();
             
-            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK){
+            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000)){
                 if(command == 0xE2)
                 {
                     registered_password = bufferPayload[1] << 8;
@@ -295,7 +356,7 @@ class LoRaMESH{
             PrepareFrameCommand(id, 0xCA, bufferPayload, b + 1);
             SendPacket();
             
-            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK)
+            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000))
             {
                 if(command == 0xCA)
                 return true;
@@ -322,7 +383,7 @@ class LoRaMESH{
             buffer_password = bufferPayload[2] << 8;
             buffer_password += bufferPayload[1];
                 
-            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK)
+            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000))
             {
                 if(command == 0xCD)
                 {
@@ -348,7 +409,7 @@ class LoRaMESH{
                 SendPacket();
             }
 
-            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK){
+            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000)){
                 if(command == 0xD6){
                     BW = bufferPayload[2];
                     SF = bufferPayload[3];
@@ -371,7 +432,7 @@ class LoRaMESH{
                 SendPacket();
             }
             
-            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK){
+            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000)){
                 if(command == 0xC1){
                     LoRa_class = bufferPayload[2];
                     LoRa_window = bufferPayload[3];
@@ -453,7 +514,7 @@ class LoRaMESH{
             PrepareFrameCommand(localId, 0xC2, bufferPayload, b + 1);
             SendPacket();
             
-            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK)
+            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000))
             {
                 if(command == 0xC2){
                 return true;
@@ -494,7 +555,7 @@ class LoRaMESH{
 
         double read_gpio(int16_t id, uint8_t gpio, bool analog = false){
             get_gpio_status(id, gpio);
-            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000) == MESH_OK)
+            if(ReceivePacketCommand(&localId, &command, bufferPayload, &payloadSize, 1000))
             {
                 if(command == 0xC2){
                     if(analog){
