@@ -586,6 +586,21 @@ class LoRaMESH{
             
             return true;
         }
+
+	bool write_gpio_mask(int16_t id, uint8_t logical_level_mask){
+
+            uint8_t b = 0;
+
+            bufferPayload[b] = 0x81;
+            bufferPayload[++b] = 0x00;
+            bufferPayload[++b] = logical_level_mask;
+            bufferPayload[++b] = 0x00;
+
+            PrepareFrameCommand(id, 0xC2, bufferPayload, b + 1);
+            SendPacket();
+            
+            return true;
+        }
         
         void printHex(uint8_t* num, uint8_t tam){
             char hexCar[4];
